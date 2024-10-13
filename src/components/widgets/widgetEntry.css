@@ -14,6 +14,7 @@
 .entry-right-body {
   flex-direction: column;
   justify-content: center;
+  max-width: calc(100% - 60px);
 }
 
 .entry-title {
@@ -29,3 +30,12 @@
   color: #c4d0e37c;
   margin: 0;
 }
+
+.entry-title,
+.entry-subtitle {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
