@@ -6,20 +6,21 @@ import { FiChevronRight } from "react-icons/fi";
 
 function WidgetCard({ title, similar, featured, newRelease }) {
   {
-    console.log(
-      "similar",
-      similar,
-      "featured",
-      featured,
-      "newRelease",
-      newRelease
-    );
+    // console.log(
+    //   "similar",
+    //   similar,
+    //   "featured",
+    //   featured,
+    //   "newRelease",
+    //   newRelease
+    // );
     return (
       <div className="widgetcard-body">
         <p className="widget-title">{title}</p>
         {similar
           ? similar.map((artist) => (
               <WidgetEntry
+                key={artist?.id}
                 title={artist?.name}
                 subtitle={artist?.followers?.total + " Followers"}
                 image={artist?.images[2]?.url}
@@ -28,6 +29,7 @@ function WidgetCard({ title, similar, featured, newRelease }) {
           : featured
           ? featured.map((playlist) => (
               <WidgetEntry
+                key={playlist?.id}
                 title={playlist?.name}
                 subtitle={playlist?.tracks?.total + " Songs"}
                 image={playlist?.images[0]?.url}
@@ -36,6 +38,7 @@ function WidgetCard({ title, similar, featured, newRelease }) {
           : newRelease
           ? newRelease.map((album) => (
               <WidgetEntry
+                key={album?.id}
                 title={album?.name}
                 subtitle={album?.artists[0]?.name}
                 image={album?.images[2]?.url}

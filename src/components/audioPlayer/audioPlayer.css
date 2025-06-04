@@ -1,4 +1,6 @@
 .player-body {
+  /* position: relative;
+  top: 10px; */
   width: 100%;
   height: 37%;
   margin: 3% 0%;
@@ -16,18 +18,21 @@
 }
 
 .song-title {
+  position: relative;
+  top: 3px;
   text-align: center;
-  font-size: 58px;
+  font-size: 20px;
   font-weight: bold;
   margin: 0px;
   color: #c4d0e3;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
+  /* overflow: hidden; */
+  /* text-overflow: ellipsis; */
+  /* display: -webkit-box; */
+  /* -webkit-line-clamp: 1; */
+  /* line-clamp: 2; */
+  /* -webkit-box-orient: vertical; */
 }
+
 
 .song-artist {
   color: #9aa9c2;

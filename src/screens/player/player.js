@@ -27,17 +27,18 @@ function Player() {
   useEffect(() => {
     setCurrentTrack(tracks[currentIndex]?.track);
   }, [currentIndex, tracks]);
-  
+
   return (
     <div className="screen-container flex">
       <div className="left-player-body">
         <AudioPlayer
           currentTrack={currentTrack}
+          album={currentTrack?.album}
           total={tracks}
           currentIndex={currentIndex}
           setCurrentIndex={setCurrentIndex}
         />
-        <Widgets artistID={currentTrack?.album?.artists[0]?.id} /> 
+        <Widgets artistID={currentTrack?.album?.artists[0]?.id} />
       </div>
       <div className="right-player-body">
         <SongCard album={currentTrack?.album} />

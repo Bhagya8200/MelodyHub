@@ -14,9 +14,9 @@ function Home() {
   const [token, setToken] = useState("");
 
   useEffect(() => {
-    const token = window.localStorage.getItem("token");
     const hash = window.location.hash;
-    window.location.hash = "";
+    const token = window.localStorage.getItem("token");
+
     if (!token && hash) {
       const _token = hash.split("&")[0].split("=")[1];
       window.localStorage.setItem("token", _token);
@@ -26,6 +26,7 @@ function Home() {
       setToken(token);
       setClientToken(token);
     }
+    window.location.hash = "";
   }, []);
 
   return !token ? (
