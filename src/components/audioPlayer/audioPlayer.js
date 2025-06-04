@@ -139,7 +139,7 @@
 
 // export default AudioPlayer;
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import "./audioPlayer.css";
 import Control from "./control";
 import ProgressCircle from "./progressCircle";
@@ -156,10 +156,11 @@ function AudioPlayer({
   const [trackProgress, setTrackProgress] = useState(0);
   const [enhancedPreviewUrl, setEnhancedPreviewUrl] = useState(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [audioReady, setAudioReady] = useState(false);
 
   const audioRef = useRef();
   const intervalRef = useRef();
-  const isReady = useRef(false);
+  const hasInitialized = useRef(false);
 
   // Get current track data
   const currentTrackData = total[currentIndex]?.track;
@@ -167,13 +168,18 @@ function AudioPlayer({
   // Use enhanced URL if available, otherwise fallback to original
   const audioSrc = enhancedPreviewUrl || currentTrackData?.preview_url;
 
-  // console.log(album?.name);
+  console.log(
+    "AudioPlayer render - currentIndex:",
+    currentIndex,
+    "track:",
+    currentTrackData?.name
+  );
 
   const { duration } = audioRef.current || {};
   const currentPercentage = duration ? (trackProgress / duration) * 100 : 0;
 
   // Function to get enhanced preview URL from backend
-  const getEnhancedPreviewUrl = async (track) => {
+  const getEnhancedPreviewUrl = useCallback(async (track) => {
     try {
       setIsLoadingPreview(true);
 
@@ -210,11 +216,6 @@ function AudioPlayer({
 
       if (data.success && data.track?.previewUrl) {
         console.log("✓ Enhanced preview URL found:", data.track.previewUrl);
-        console.log("✓ Track details:", {
-          name: data.track.name,
-          artist: data.track.artist,
-          hasMultipleUrls: data.track.allPreviewUrls?.length > 1,
-        });
         return data.track.previewUrl;
       } else {
         console.log("✗ No enhanced preview URL found, using original");
@@ -226,11 +227,10 @@ function AudioPlayer({
     } finally {
       setIsLoadingPreview(false);
     }
-  };
+  }, []);
 
-  const startTimer = () => {
+  const startTimer = useCallback(() => {
     clearInterval(intervalRef.current);
-
     intervalRef.current = setInterval(() => {
       if (audioRef.current?.ended) {
         handleNext();
@@ -238,37 +238,35 @@ function AudioPlayer({
         setTrackProgress(audioRef.current.currentTime);
       }
     }, 1000);
-  };
+  }, []);
 
-  const stopTimer = () => {
+  const stopTimer = useCallback(() => {
     clearInterval(intervalRef.current);
-  };
+  }, []);
 
-  // Handle play/pause state changes
-  useEffect(() => {
+  // Handle play/pause
+  const togglePlayback = useCallback(async () => {
     if (!audioRef.current || isLoadingPreview) return;
 
-    if (isPlaying) {
-      const playPromise = audioRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            startTimer();
-          })
-          .catch((error) => {
-            console.error("Error playing audio:", error);
-            setIsPlaying(false);
-          });
+    try {
+      if (isPlaying) {
+        audioRef.current.pause();
+        stopTimer();
+      } else {
+        await audioRef.current.play();
+        startTimer();
       }
-    } else {
-      audioRef.current.pause();
-      stopTimer();
+    } catch (error) {
+      console.error("Error toggling playback:", error);
+      setIsPlaying(false);
     }
-  }, [isPlaying, isLoadingPreview]);
+  }, [isPlaying, isLoadingPreview, startTimer, stopTimer]);
 
-  // Handle track changes
-  useEffect(() => {
-    const loadNewTrack = async () => {
+  // Load and setup audio for current track
+  const loadTrack = useCallback(
+    async (trackIndex) => {
+      console.log(`🎵 Loading track ${trackIndex}...`);
+
       // Stop current playback
       if (audioRef.current) {
         audioRef.current.pause();
@@ -278,61 +276,115 @@ function AudioPlayer({
       // Reset states
       setTrackProgress(0);
       setEnhancedPreviewUrl(null);
+      setAudioReady(false);
 
-      // Get current track data
-      const trackData = total[currentIndex]?.track;
+      // Get track data
+      const trackData = total[trackIndex]?.track;
 
       if (!trackData) {
-        console.log("No track data available");
+        console.log("❌ No track data available for index:", trackIndex);
         setIsPlaying(false);
         return;
       }
 
-      // Try to get enhanced preview URL from backend
+      console.log(
+        `📀 Track: "${trackData.name}" by ${trackData.artists?.[0]?.name}`
+      );
+
+      // Try to get enhanced preview URL
       const enhancedUrl = await getEnhancedPreviewUrl(trackData);
       setEnhancedPreviewUrl(enhancedUrl);
 
       // Determine final audio source
       const finalAudioSrc = enhancedUrl || trackData.preview_url;
 
-      if (finalAudioSrc) {
-        // Create new audio instance with the final URL
-        audioRef.current = new Audio(finalAudioSrc);
-
-        // Set up audio event listeners
-        audioRef.current.addEventListener("loadedmetadata", () => {
-          console.log(
-            "Audio metadata loaded, duration:",
-            audioRef.current.duration
-          );
-        });
-
-        audioRef.current.addEventListener("error", (e) => {
-          console.error("Audio loading error:", e);
-          setIsPlaying(false);
-        });
-
-        audioRef.current.addEventListener("canplay", () => {
-          console.log("Audio can play");
-          if (isReady.current && isPlaying) {
-            audioRef.current.play().catch(console.error);
-          }
-        });
-
-        // Auto-play if ready
-        if (isReady.current) {
-          setIsPlaying(true);
-        } else {
-          isReady.current = true;
-        }
-      } else {
-        console.log("No audio source available for this track");
+      if (!finalAudioSrc) {
+        console.log("❌ No audio source available for this track");
         setIsPlaying(false);
+        setAudioReady(true); // Still mark as ready so UI updates
+        return;
       }
-    };
 
-    loadNewTrack();
-  }, [currentIndex]);
+      console.log(
+        `🔗 Using audio source:`,
+        finalAudioSrc.substring(0, 50) + "..."
+      );
+
+      // Create new audio instance
+      audioRef.current = new Audio(finalAudioSrc);
+
+      // Set up event listeners
+      audioRef.current.addEventListener("loadedmetadata", () => {
+        console.log(
+          "✅ Audio metadata loaded, duration:",
+          audioRef.current.duration
+        );
+        setAudioReady(true);
+      });
+
+      audioRef.current.addEventListener("canplay", () => {
+        console.log("✅ Audio can play");
+        setAudioReady(true);
+      });
+
+      audioRef.current.addEventListener("error", (e) => {
+        console.error("❌ Audio loading error:", e);
+        setIsPlaying(false);
+        setAudioReady(true); // Mark as ready even with error so UI doesn't hang
+      });
+
+      // Load the audio
+      audioRef.current.load();
+    },
+    [total, getEnhancedPreviewUrl, stopTimer]
+  );
+
+  // Effect to load track when currentIndex changes
+  useEffect(() => {
+    console.log(`🔄 Track index changed to: ${currentIndex}`);
+    loadTrack(currentIndex);
+  }, [currentIndex, loadTrack]);
+
+  // Effect to handle initial playback once audio is ready
+  useEffect(() => {
+    if (audioReady && audioRef.current && !isLoadingPreview) {
+      console.log(
+        `🎯 Audio ready for track ${currentIndex}, hasInitialized: ${hasInitialized.current}`
+      );
+
+      // Auto-start the first track, or continue playing if switching tracks
+      if (!hasInitialized.current || isPlaying) {
+        console.log("▶️ Starting playback...");
+        setIsPlaying(true);
+        hasInitialized.current = true;
+      }
+    }
+  }, [audioReady, currentIndex, isLoadingPreview]);
+
+  // Effect to handle actual play/pause
+  useEffect(() => {
+    if (!audioReady || !audioRef.current || isLoadingPreview) return;
+
+    if (isPlaying) {
+      console.log("▶️ Playing audio...");
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log("✅ Audio started successfully");
+            startTimer();
+          })
+          .catch((error) => {
+            console.error("❌ Error playing audio:", error);
+            setIsPlaying(false);
+          });
+      }
+    } else {
+      console.log("⏸️ Pausing audio...");
+      audioRef.current.pause();
+      stopTimer();
+    }
+  }, [isPlaying, audioReady, isLoadingPreview, startTimer, stopTimer]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -342,23 +394,23 @@ function AudioPlayer({
       }
       stopTimer();
     };
-  }, []);
+  }, [stopTimer]);
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     if (currentIndex < total.length - 1) {
       setCurrentIndex(currentIndex + 1);
     } else {
       setCurrentIndex(0);
     }
-  };
+  }, [currentIndex, total.length, setCurrentIndex]);
 
-  const handlePrev = () => {
+  const handlePrev = useCallback(() => {
     if (currentIndex - 1 < 0) {
       setCurrentIndex(total.length - 1);
     } else {
       setCurrentIndex(currentIndex - 1);
     }
-  };
+  }, [currentIndex, total.length, setCurrentIndex]);
 
   const addZero = (n) => {
     return n > 9 ? "" + n : "0" + n;
@@ -381,7 +433,7 @@ function AudioPlayer({
       <div className="player-left-body">
         <ProgressCircle
           percentage={currentPercentage}
-          isPlaying={isPlaying && !isLoadingPreview}
+          isPlaying={isPlaying && !isLoadingPreview && audioReady}
           image={currentTrack?.album?.images?.[0]?.url}
           size={300}
           color="#C96850"
@@ -417,6 +469,8 @@ function AudioPlayer({
         >
           {isLoadingPreview ? (
             <span>🔍 Searching for enhanced preview...</span>
+          ) : !audioReady ? (
+            <span>🔄 Loading audio...</span>
           ) : enhancedPreviewUrl ? (
             <span style={{ color: "#4CAF50" }}>✓ Using enhanced preview</span>
           ) : audioSrc ? (
@@ -429,11 +483,13 @@ function AudioPlayer({
         <div className="player-right-bottom flex">
           <div className="song-duration flex">
             <p className="duration">0:{addZero(Math.round(trackProgress))}</p>
-            <WaveAnimation isPlaying={isPlaying && !isLoadingPreview} />
+            <WaveAnimation
+              isPlaying={isPlaying && !isLoadingPreview && audioReady}
+            />
             <p className="duration">0:30</p>
           </div>
           <Control
-            isPlaying={isPlaying && !isLoadingPreview}
+            isPlaying={isPlaying && !isLoadingPreview && audioReady}
             setIsPlaying={setIsPlaying}
             handleNext={handleNext}
             handlePrev={handlePrev}
