@@ -345,21 +345,24 @@ function AudioPlayer({
     loadTrack(currentIndex);
   }, [currentIndex, loadTrack]);
 
-  // Effect to handle initial playback once audio is ready
+  // Effect to handle playback state once audio is ready
   useEffect(() => {
     if (audioReady && audioRef.current && !isLoadingPreview) {
       console.log(
         `🎯 Audio ready for track ${currentIndex}, hasInitialized: ${hasInitialized.current}`
       );
 
-      // Auto-start the first track, or continue playing if switching tracks
-      if (!hasInitialized.current || isPlaying) {
-        console.log("▶️ Starting playback...");
-        setIsPlaying(true);
+      // Only continue playing if we were already playing (track switching)
+      if (hasInitialized.current && isPlaying) {
+        console.log("▶️ Continuing playback for track switch...");
+        // isPlaying state will trigger the play effect
+      } else if (!hasInitialized.current) {
+        // Mark as initialized but don't auto-play
         hasInitialized.current = true;
+        console.log("✅ First track ready, waiting for user to click play");
       }
     }
-  }, [audioReady, currentIndex, isLoadingPreview]);
+  }, [audioReady, currentIndex, isLoadingPreview, isPlaying]);
 
   // Effect to handle actual play/pause
   useEffect(() => {
