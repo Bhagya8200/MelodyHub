@@ -103,7 +103,7 @@ function AudioPlayer({
         `Requesting enhanced preview for: ${songName} by ${artistName}`
       );
 
-      const response = await fetch("http://localhost:5000/api/get-preview", {
+      const response = await fetch("https://melodyhub-ajol.onrender.com/api/get-preview", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
