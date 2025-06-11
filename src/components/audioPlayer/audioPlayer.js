@@ -1,144 +1,3 @@
-// import React, { useState, useRef, useEffect } from "react";
-// import "./audioPlayer.css";
-// import Control from "./control";
-// import ProgressCircle from "./progressCircle";
-// import WaveAnimation from "./waveAnimation";
-
-// function AudioPlayer({
-//   currentTrack,
-//   album,
-//   currentIndex,
-//   setCurrentIndex,
-//   total,
-// }) {
-//   const [isPlaying, setIsPlaying] = useState(false);
-//   const [trackProgress, setTrackProgress] = useState(0);
-//   var audioSrc = total[currentIndex]?.track.preview_url;
-//   console.log(album?.name);
-
-//   const spotifyClientId = import.meta.env.SPOTIFY_CLIENT_ID;
-//   const spotifyClientSecret = import.meta.env.SPOTIFY_CLIENT_SECRET;
-
-//   const audioRef = useRef(new Audio(total[0]?.track.preview_url));
-
-//   const intervalRef = useRef();
-
-//   const isReady = useRef(false);
-
-//   const { duration } = audioRef.current;
-
-//   const currentPercentage = duration ? (trackProgress / duration) * 100 : 0;
-
-//   const startTimer = () => {
-//     clearInterval(intervalRef.current);
-
-//     intervalRef.current = setInterval(() => {
-//       if (audioRef.current.ended) {
-//         handleNext();
-//       } else {
-//         setTrackProgress(audioRef.current.currentTime);
-//       }
-//     }, [1000]);
-//   };
-
-//   useEffect(() => {
-//     if (audioRef.current.src) {
-//       if (isPlaying) {
-//         audioRef.current.play();
-//         startTimer();
-//       } else {
-//         clearInterval(intervalRef.current);
-//         audioRef.current.pause();
-//       }
-//     } else {
-//       if (isPlaying) {
-//         audioRef.current = new Audio(audioSrc);
-//         audioRef.current.play();
-//         startTimer();
-//       } else {
-//         clearInterval(intervalRef.current);
-//         audioRef.current.pause();
-//       }
-//     }
-//   }, [isPlaying]);
-
-//   useEffect(() => {
-//     audioRef.current.pause();
-//     audioRef.current = new Audio(audioSrc);
-
-//     setTrackProgress(audioRef.current.currentTime);
-
-//     if (isReady.current) {
-//       audioRef.current.play();
-//       setIsPlaying(true);
-//       startTimer();
-//     } else {
-//       isReady.current = true;
-//     }
-//   }, [currentIndex]);
-
-//   useEffect(() => {
-//     return () => {
-//       audioRef.current.pause();
-//       clearInterval(intervalRef.current);
-//     };
-//   }, []);
-
-//   const handleNext = () => {
-//     if (currentIndex < total.length - 1) {
-//       setCurrentIndex(currentIndex + 1);
-//     } else setCurrentIndex(0);
-//   };
-
-//   const handlePrev = () => {
-//     if (currentIndex - 1 < 0) setCurrentIndex(total.length - 1);
-//     else setCurrentIndex(currentIndex - 1);
-//   };
-
-//   const addZero = (n) => {
-//     return n > 9 ? "" + n : "0" + n;
-//   };
-
-//   const artists = [];
-//   currentTrack?.album?.artists.forEach((artist) => {
-//     artists.push(artist.name);
-//   });
-
-//   return (
-//     <div className="player-body flex">
-//       <div className="player-left-body">
-//         <ProgressCircle
-//           percentage={currentPercentage}
-//           isPlaying={true}
-//           image={currentTrack?.album?.images[0]?.url}
-//           size={300}
-//           color="#C96850"
-//         />
-//       </div>
-//       <div className="player-right-body flex">
-//         <p className="song-title">{currentTrack?.name}</p>
-//         <p className="song-artist">{artists.join(" | ")}</p>
-//         <div className="player-right-bottom flex">
-//           <div className="song-duration flex">
-//             <p className="duration">0:{addZero(Math.round(trackProgress))}</p>
-//             <WaveAnimation isPlaying={isPlaying} />
-//             <p className="duration">0:30</p>
-//           </div>
-//           <Control
-//             isPlaying={isPlaying}
-//             setIsPlaying={setIsPlaying}
-//             handleNext={handleNext}
-//             handlePrev={handlePrev}
-//             total={total}
-//           />
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
-// export default AudioPlayer;
-
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import "./audioPlayer.css";
 import Control from "./control";
@@ -161,6 +20,12 @@ function AudioPlayer({
   const audioRef = useRef();
   const intervalRef = useRef();
   const hasInitialized = useRef(false);
+  const isPlayingRef = useRef(false); // Add ref to track playing state
+
+  // Keep isPlayingRef in sync
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
 
   // Get current track data
   const currentTrackData = total[currentIndex]?.track;
@@ -177,6 +42,48 @@ function AudioPlayer({
 
   const { duration } = audioRef.current || {};
   const currentPercentage = duration ? (trackProgress / duration) * 100 : 0;
+
+  // Navigation functions - FIXED
+  const handleNext = useCallback(() => {
+    console.log(
+      `🔄 Auto-advancing: ${currentIndex} -> ${
+        currentIndex < total.length - 1 ? currentIndex + 1 : 0
+      }`
+    );
+
+    // Remember if we were playing for auto-continuation
+    const wasPlaying = isPlayingRef.current;
+
+    if (currentIndex < total.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+    } else {
+      console.log("🔄 Looping back to first track");
+      setCurrentIndex(0);
+    }
+
+    // IMPORTANT: Maintain playing state for auto-playback
+    if (wasPlaying) {
+      console.log("▶️ Ensuring playback continues to next track");
+      // Don't change isPlaying here - let the effect handle it
+      // The playing state will be maintained through the track change
+    }
+  }, [currentIndex, total.length, setCurrentIndex]);
+
+  const handlePrev = useCallback(() => {
+    console.log(`🔄 Moving to previous track from ${currentIndex}`);
+    const wasPlaying = isPlayingRef.current;
+
+    if (currentIndex - 1 < 0) {
+      setCurrentIndex(total.length - 1);
+    } else {
+      setCurrentIndex(currentIndex - 1);
+    }
+
+    // Maintain playing state
+    if (wasPlaying) {
+      setIsPlaying(true);
+    }
+  }, [currentIndex, total.length, setCurrentIndex]);
 
   // Function to get enhanced preview URL from backend
   const getEnhancedPreviewUrl = useCallback(async (track) => {
@@ -229,16 +136,31 @@ function AudioPlayer({
     }
   }, []);
 
+  // FIXED startTimer - removed isPlaying dependency to prevent stale closures
   const startTimer = useCallback(() => {
     clearInterval(intervalRef.current);
     intervalRef.current = setInterval(() => {
-      if (audioRef.current?.ended) {
-        handleNext();
-      } else if (audioRef.current) {
-        setTrackProgress(audioRef.current.currentTime);
+      if (audioRef.current) {
+        if (audioRef.current.ended) {
+          console.log(
+            "🔚 Track ended - Current playing state:",
+            isPlayingRef.current
+          );
+          clearInterval(intervalRef.current);
+
+          // Use ref instead of state to avoid stale closure
+          if (isPlayingRef.current) {
+            console.log("🎵 Auto-advancing to next track...");
+            handleNext();
+          } else {
+            console.log("⏸️ Was paused, not auto-advancing");
+          }
+        } else {
+          setTrackProgress(audioRef.current.currentTime);
+        }
       }
     }, 1000);
-  }, []);
+  }, [handleNext]); // Removed isPlaying dependency
 
   const stopTimer = useCallback(() => {
     clearInterval(intervalRef.current);
@@ -252,9 +174,11 @@ function AudioPlayer({
       if (isPlaying) {
         audioRef.current.pause();
         stopTimer();
+        setIsPlaying(false);
       } else {
         await audioRef.current.play();
         startTimer();
+        setIsPlaying(true);
       }
     } catch (error) {
       console.error("Error toggling playback:", error);
@@ -267,10 +191,20 @@ function AudioPlayer({
     async (trackIndex) => {
       console.log(`🎵 Loading track ${trackIndex}...`);
 
-      // Stop current playback
+      // Remember if we were playing before track change
+      const wasPlaying = isPlayingRef.current;
+
+      // Stop current playback and timer immediately
+      stopTimer();
+
+      // Properly cleanup old audio instance
       if (audioRef.current) {
+        console.log("🧹 Cleaning up previous audio instance...");
         audioRef.current.pause();
-        stopTimer();
+        audioRef.current.currentTime = 0;
+        audioRef.current.src = "";
+        audioRef.current.load();
+        audioRef.current = null;
       }
 
       // Reset states
@@ -301,7 +235,7 @@ function AudioPlayer({
       if (!finalAudioSrc) {
         console.log("❌ No audio source available for this track");
         setIsPlaying(false);
-        setAudioReady(true); // Still mark as ready so UI updates
+        setAudioReady(true);
         return;
       }
 
@@ -310,30 +244,43 @@ function AudioPlayer({
         finalAudioSrc.substring(0, 50) + "..."
       );
 
-      // Create new audio instance
-      audioRef.current = new Audio(finalAudioSrc);
+      // Create completely new audio instance
+      console.log("🆕 Creating new audio instance...");
+      audioRef.current = new Audio();
 
       // Set up event listeners
-      audioRef.current.addEventListener("loadedmetadata", () => {
+      const handleLoadedMetadata = () => {
         console.log(
           "✅ Audio metadata loaded, duration:",
-          audioRef.current.duration
+          audioRef.current?.duration
         );
         setAudioReady(true);
-      });
 
-      audioRef.current.addEventListener("canplay", () => {
+        // IMPORTANT: Auto-play if we were playing before track change
+        if (wasPlaying && hasInitialized.current) {
+          console.log("🚀 Auto-continuing playback for new track...");
+          setIsPlaying(true);
+        }
+      };
+
+      const handleCanPlay = () => {
         console.log("✅ Audio can play");
         setAudioReady(true);
-      });
+      };
 
-      audioRef.current.addEventListener("error", (e) => {
+      const handleError = (e) => {
         console.error("❌ Audio loading error:", e);
         setIsPlaying(false);
-        setAudioReady(true); // Mark as ready even with error so UI doesn't hang
-      });
+        setAudioReady(true);
+      };
 
-      // Load the audio
+      // Add event listeners
+      audioRef.current.addEventListener("loadedmetadata", handleLoadedMetadata);
+      audioRef.current.addEventListener("canplay", handleCanPlay);
+      audioRef.current.addEventListener("error", handleError);
+
+      // Set the source and load
+      audioRef.current.src = finalAudioSrc;
       audioRef.current.load();
     },
     [total, getEnhancedPreviewUrl, stopTimer]
@@ -349,15 +296,13 @@ function AudioPlayer({
   useEffect(() => {
     if (audioReady && audioRef.current && !isLoadingPreview) {
       console.log(
-        `🎯 Audio ready for track ${currentIndex}, hasInitialized: ${hasInitialized.current}`
+        `🎯 Audio ready for track ${currentIndex}:`,
+        `hasInitialized=${hasInitialized.current},`,
+        `isPlaying=${isPlaying},`,
+        `audioReady=${audioReady}`
       );
 
-      // Only continue playing if we were already playing (track switching)
-      if (hasInitialized.current && isPlaying) {
-        console.log("▶️ Continuing playback for track switch...");
-        // isPlaying state will trigger the play effect
-      } else if (!hasInitialized.current) {
-        // Mark as initialized but don't auto-play
+      if (!hasInitialized.current) {
         hasInitialized.current = true;
         console.log("✅ First track ready, waiting for user to click play");
       }
@@ -392,28 +337,15 @@ function AudioPlayer({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      stopTimer();
       if (audioRef.current) {
         audioRef.current.pause();
+        audioRef.current.src = "";
+        audioRef.current.load();
+        audioRef.current = null;
       }
-      stopTimer();
     };
   }, [stopTimer]);
-
-  const handleNext = useCallback(() => {
-    if (currentIndex < total.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-    } else {
-      setCurrentIndex(0);
-    }
-  }, [currentIndex, total.length, setCurrentIndex]);
-
-  const handlePrev = useCallback(() => {
-    if (currentIndex - 1 < 0) {
-      setCurrentIndex(total.length - 1);
-    } else {
-      setCurrentIndex(currentIndex - 1);
-    }
-  }, [currentIndex, total.length, setCurrentIndex]);
 
   const addZero = (n) => {
     return n > 9 ? "" + n : "0" + n;
@@ -494,6 +426,7 @@ function AudioPlayer({
           <Control
             isPlaying={isPlaying && !isLoadingPreview && audioReady}
             setIsPlaying={setIsPlaying}
+            togglePlayback={togglePlayback}
             handleNext={handleNext}
             handlePrev={handlePrev}
             total={total}
